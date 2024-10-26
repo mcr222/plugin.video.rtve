@@ -6,8 +6,8 @@ import urllib.request, urllib.parse, urllib.error
 
 tv3 = rtve("", "")
 #tv3.listColeccions()
-temporades = tv3.listProgrames("https://api.rtve.es/api/tematicas/66972")
-
+(temporades, videos) = tv3.listProgrames("https://api.rtve.es/api/tematicas/823")
+type(temporades[0])
 # temporades = tv3.getListTemporades('200164279')
 print(len(temporades))
 for temp in temporades:

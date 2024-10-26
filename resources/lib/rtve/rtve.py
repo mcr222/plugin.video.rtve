@@ -25,6 +25,8 @@ class rtve(object):
 
     def listProgrames(self, urlApi):
         xbmc.log("plugin.video.rtve - programas " + urlApi)
+        folders = []
+        videos = []
         print(urlApi)
         hijosJson ="hijos.json?page="
         videosJson = "videos.json?page="
@@ -59,38 +61,33 @@ class rtve(object):
         if hijosUrl:
             hijosItems = self.getJsonData(hijosUrl)['page']['items']
             if len(hijosItems)>0:
-                lFolderVideos = []
 
                 for item in hijosItems:
                     xbmc.log("plugin.video.rtve - element " + str(item))
                     foldVideo = FolderVideo(item['title'], "https://api.rtve.es/api/tematicas/" + item['id'], 'getProgrames')
-                    lFolderVideos.append(foldVideo)
+                    folders.append(foldVideo)
 
                 if previousHijosUrl:
-                    lFolderVideos.append(FolderVideo("Anterior Pag", previousHijosUrl, 'getProgrames'))
+                    folders.append(FolderVideo("Anterior Pag", previousHijosUrl, 'getProgrames'))
 
-                lFolderVideos.append(FolderVideo("Siguiente Pag", nextHijosUrl, 'getProgrames'))
-
-                return lFolderVideos
+                folders.append(FolderVideo("Siguiente Pag", nextHijosUrl, 'getProgrames'))
+                return (folders, videos)
 
         if videosUrl:
             videosItems = self.getJsonData(videosUrl)['page']['items']
             if len(videosItems)>0:
-                lFolderVideos = []
-
                 for item in videosItems:
                     xbmc.log("plugin.video.rtve - element " + str(item))
-                    video = Video(item['title'], "", "", item['description'],  "https://api.rtve.es/api/tematicas/" + item['id'], "")
-                    lFolderVideos.append(video)
+                    img = item['thumbnail']
+                    video = Video(item['title'], img, img, item['description'],  item['id'], "")
+                    videos.append(video)
 
                 if previousVideosUrl:
-                    lFolderVideos.append(FolderVideo("Anterior Pag", previousVideosUrl, 'getProgrames'))
+                    folders.append(FolderVideo("Anterior Pag", previousVideosUrl, 'getProgrames'))
 
-                lFolderVideos.append(FolderVideo("Siguiente Pag", nextVideosUrl, 'getProgrames'))
+                folders.append(FolderVideo("Siguiente Pag", nextVideosUrl, 'getProgrames'))
 
-                return lFolderVideos
-
-        return []
+        return (folders, videos)
 
     def getJsonData(self, apiUrl):
         print(apiUrl)
