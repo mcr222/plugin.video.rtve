@@ -13,7 +13,7 @@ class NetworkError(Exception):
     pass
 
 
-def getJsonData(apiUrl: str, max_retries: int = 3, retry_delay: int = 2) -> Dict[str, Any]:
+def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1) -> Dict[str, Any]:
     """
     Fetch JSON data from a URL with retry logic and proper error handling.
 
