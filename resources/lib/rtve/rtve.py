@@ -22,7 +22,6 @@ class rtve(object):
                                  "")
         return [coleccions]
 
-
     def listProgrames(self, urlApi):
         xbmc.log("plugin.video.rtve - programas " + urlApi)
         folders = []
@@ -64,7 +63,22 @@ class rtve(object):
 
                 for item in hijosItems:
                     xbmc.log("plugin.video.rtve - element " + str(item))
-                    foldVideo = FolderVideo(item['title'], "https://api.rtve.es/api/tematicas/" + item['id'], 'getProgrames')
+                    itemid = item['id']
+                    programa_url = "https://www.rtve.es/api/programas/{}".format(itemid)
+                    img=""
+                    try:
+                        programaJson = getJsonData(programa_url, 1)['page']['items'][0]
+                        img = programaJson.get('imgPoster', "")
+                        if not img:
+                            img = programaJson.get('imgCol', "")
+                        if not img:
+                            img = programaJson.get('thumbnail', "")
+                        if not img:
+                            img = programaJson.get('imgBackground', "")
+                    except Exception as e:
+                        img=""
+
+                    foldVideo = FolderVideo(item['title'], "https://api.rtve.es/api/tematicas/" + itemid, 'getProgrames', img, img)
                     folders.append(foldVideo)
 
                 if previousHijosUrl:
