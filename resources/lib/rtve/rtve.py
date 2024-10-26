@@ -59,7 +59,7 @@ class rtve(object):
                 previousVideosUrl = split[0] + "=" + str(currentPage - 1)
 
         if hijosUrl:
-            hijosItems = self.getJsonData(hijosUrl)['page']['items']
+            hijosItems = getJsonData(hijosUrl)['page']['items']
             if len(hijosItems)>0:
 
                 for item in hijosItems:
@@ -74,7 +74,7 @@ class rtve(object):
                 return (folders, videos)
 
         if videosUrl:
-            videosItems = self.getJsonData(videosUrl)['page']['items']
+            videosItems = getJsonData(videosUrl)['page']['items']
             if len(videosItems)>0:
                 for item in videosItems:
                     xbmc.log("plugin.video.rtve - element " + str(item))
@@ -88,10 +88,3 @@ class rtve(object):
                 folders.append(FolderVideo("Siguiente Pag", nextVideosUrl, 'getProgrames'))
 
         return (folders, videos)
-
-    def getJsonData(self, apiUrl):
-        print(apiUrl)
-        with urllib.request.urlopen(apiUrl) as response:
-            data = response.read()
-            json_data = json.loads(data)
-            return json_data

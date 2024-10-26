@@ -1,7 +1,7 @@
 from builtins import str
 from builtins import object
 
-from resources.lib.utils.Utils import buildUrl
+from resources.lib.utils.Utils import buildUrl, getJsonData
 from resources.lib.rtve.rtve import rtve
 import xbmcaddon
 import xbmcplugin
@@ -121,9 +121,17 @@ class UI(object):
     def playVideo(self,videoId):
         xbmc.log("plugin.video.rtve -UI - playVideo " + str(videoId))
 
-        streamUrl = "https://ztnr.rtve.es/ztnr/{}.mpd".format(
-            videoId)
-        xbmc.log("plugin.video.rtve - UI - playVideo apijson url" + str(streamUrl))
+        stream_url = "https://ztnr.rtve.es/ztnr/{}.mpd".format(videoId)
+        xbmc.log("plugin.video.rtve - UI - playVideo apijson url" + str(stream_url))
+
+        tokenUrl = "https://api.rtve.es/api/token/{}".format(videoId)
+        tokenJson = getJsonData(tokenUrl)
+
+        xbmc.log("plugin.video.rtve - UI - playVideo token json" + str(tokenJson))
+
+        license_url = tokenJson['widevineURL']
+        xbmc.log("plugin.video.rtve - UI - playVideo widevine url" + str(license_url))
+
 
         from inputstreamhelper import Helper  # pylint: disable=import-outside-toplevel
         from urllib.parse import quote
@@ -131,11 +139,6 @@ class UI(object):
         # Constants
         PROTOCOL = 'mpd'
         DRM = 'com.widevine.alpha'
-
-        # Stream configuration
-        stream_url = "https://ztnr.rtve.es/ztnr/16302617.mpd"
-        license_url = "https://3e6900a5.drm-widevine-licensing.axprod.net/AcquireLicense"
-        drm_header = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ2ZXJzaW9uIjoxLCJjb21fa2V5X2lkIjoiOWRlYWZhMWUtN2UzNy00MzRhLWJkYWYtYWY1MDAxMGVlMTNhIiwibWVzc2FnZSI6eyJ0eXBlIjoiZW50aXRsZW1lbnRfbWVzc2FnZSIsInZlcnNpb24iOjIsImxpY2Vuc2UiOnsic3RhcnRfZGF0ZXRpbWUiOiIyMDI0LTEwLTI0VDE3OjA4OjIwLjM5MloiLCJleHBpcmF0aW9uX2RhdGV0aW1lIjoiMjAyNC0xMS0wMVQxODowODoyMC4zOTJaIiwiYWxsb3dfcGVyc2lzdGVuY2UiOnRydWV9LCJjb250ZW50X2tleXNfc291cmNlIjp7ImlubGluZSI6W3siaWQiOiI0NTRhNGYwOS0wMzI0LWMzOTgtN2RlZC1jZjkwMGFiZGZkNGUiLCJ1c2FnZV9wb2xpY3kiOiJQb2xpY3kgQSJ9XX0sImNvbnRlbnRfa2V5X3VzYWdlX3BvbGljaWVzIjpbeyJuYW1lIjoiUG9saWN5IEEiLCJmYWlycGxheSI6eyJoZGNwIjoiVFlQRTAifSwicGxheXJlYWR5Ijp7Im1pbl9kZXZpY2Vfc2VjdXJpdHlfbGV2ZWwiOjE1MCwicGxheV9lbmFibGVycyI6WyI3ODY2MjdEOC1DMkE2LTQ0QkUtOEY4OC0wOEFFMjU1QjAxQTciXX19XX0sImJlZ2luX2RhdGUiOiIyMDI0LTEwLTI0VDE3OjA4OjIwLjM5MloiLCJleHBpcmF0aW9uX2RhdGUiOiIyMDI0LTExLTAxVDE4OjA4OjIwLjM5MloifQ.1blUNC8unlAi-zjMMpU9u_Mu7Ns5lF9jnpY-rwK0a3s"
 
         # HTTP headers
         headers = {
@@ -163,9 +166,7 @@ class UI(object):
             play_item.setProperty('inputstream.adaptive.stream_headers', headers_string)
 
             # Configure license key with proper formatting and increased timeout
-            license_header = f'X-AxDrm-Message={quote(drm_header)}'
-            license_key = f'{license_url}|{license_header}|R{{SSM}}|'
-            play_item.setProperty('inputstream.adaptive.license_key', license_key)
+            play_item.setProperty('inputstream.adaptive.license_key', license_url)
 
             # Set additional properties
             play_item.setMimeType('application/dash+xml')
