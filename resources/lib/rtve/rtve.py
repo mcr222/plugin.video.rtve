@@ -27,7 +27,7 @@ class rtve(object):
         xbmc.log("plugin.video.rtve - programas " + urlApi)
         folders = []
         videos = []
-        print(urlApi)
+
         hijosJson ="hijos.json?page="
         videosJson = "videos.json?page="
         hijosUrl = ""

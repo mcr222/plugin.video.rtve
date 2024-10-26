@@ -124,13 +124,17 @@ class UI(object):
         stream_url = "https://ztnr.rtve.es/ztnr/{}.mpd".format(videoId)
         xbmc.log("plugin.video.rtve - UI - playVideo apijson url" + str(stream_url))
 
-        tokenUrl = "https://api.rtve.es/api/token/{}".format(videoId)
-        tokenJson = getJsonData(tokenUrl)
+        license_url = ""
+        try:
+            tokenUrl = "https://api.rtve.es/api/token/{}".format(videoId)
+            tokenJson = getJsonData(tokenUrl)
 
-        xbmc.log("plugin.video.rtve - UI - playVideo token json" + str(tokenJson))
+            xbmc.log("plugin.video.rtve - UI - playVideo token json" + str(tokenJson))
 
-        license_url = tokenJson['widevineURL']
-        xbmc.log("plugin.video.rtve - UI - playVideo widevine url" + str(license_url))
+            license_url = tokenJson['widevineURL']
+            xbmc.log("plugin.video.rtve - UI - playVideo widevine url" + str(license_url))
+        except Exception as e:
+            xbmc.log(f'Error playing DRM stream: {str(e)}', xbmc.LOGERROR)
 
 
         from inputstreamhelper import Helper  # pylint: disable=import-outside-toplevel
@@ -161,12 +165,13 @@ class UI(object):
             # Set required properties for DRM playback
             play_item.setProperty('inputstream', 'inputstream.adaptive')
             play_item.setProperty('inputstream.adaptive.manifest_type', PROTOCOL)
-            play_item.setProperty('inputstream.adaptive.license_type', DRM)
             play_item.setProperty('inputstream.adaptive.manifest_headers', headers_string)
             play_item.setProperty('inputstream.adaptive.stream_headers', headers_string)
 
             # Configure license key with proper formatting and increased timeout
-            play_item.setProperty('inputstream.adaptive.license_key', license_url)
+            if license_url:
+                play_item.setProperty('inputstream.adaptive.license_type', DRM)
+                play_item.setProperty('inputstream.adaptive.license_key', license_url)
 
             # Set additional properties
             play_item.setMimeType('application/dash+xml')
@@ -174,20 +179,16 @@ class UI(object):
 
             # Add properties to help with buffering
             play_item.setProperty('inputstream.adaptive.stream_selection_type', 'adaptive')
-            play_item.setProperty('inputstream.adaptive.stream_buffer_size', '131072')
-            play_item.setProperty('inputstream.adaptive.initial_buffer_duration', '5')
 
-            # Add these buffer settings
-            play_item.setProperty('inputstream.adaptive.stream_buffer_size', '262144')  # Increased buffer
-            play_item.setProperty('inputstream.adaptive.initial_buffer_duration', '10')  # Longer initial buffer
-            play_item.setProperty('inputstream.adaptive.max_bandwidth', '4000000')  # Higher bandwidth cap
-            play_item.setProperty('inputstream.adaptive.min_bandwidth', '1000000')  # Minimum bandwidth
-            play_item.setProperty('inputstream.adaptive.ignore_dispatch', 'true')  # Helps with smooth playback
+            # Adjust these buffering settings
+            play_item.setProperty('inputstream.adaptive.stream_buffer_size', '524288')  # Doubled buffer
+            play_item.setProperty('inputstream.adaptive.initial_buffer_duration', '15')
+            play_item.setProperty('inputstream.adaptive.persistent_storage', 'true')
+            play_item.setProperty('inputstream.adaptive.max_bandwidth', '20000000')
+            play_item.setProperty('inputstream.adaptive.min_bandwidth', '500000')
 
             # Start playback
-            player.play(item=stream_url, listitem=play_item)
-
-            # Wait for playback to actually start
+            xbmcplugin.setResolvedUrl(handle=self.addon_handle, succeeded=True, listitem=play_item)
 
             # Log success
             xbmc.log('DRM Stream playback initiated successfully', xbmc.LOGINFO)
