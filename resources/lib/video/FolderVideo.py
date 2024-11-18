@@ -7,7 +7,7 @@ class FolderVideo(object):
 
         :rtype: object
         """
-        xbmc.log("plugin.video.rtve Creant folder video " + str(name) + ", " + str(url) + ", " + str(mode))
+        xbmc.log("plugin.video.rtve Creant folder video " + str(name) + ", " + str(url) + ", " + str(mode), xbmc.LOGDEBUG)
         self.name = name
         self.url = url
         self.mode = mode
