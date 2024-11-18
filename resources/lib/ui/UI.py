@@ -1,5 +1,6 @@
 from builtins import str
 from builtins import object
+from logging import DEBUG
 
 from resources.lib.utils.Utils import buildUrl, getJsonData
 from resources.lib.rtve.rtve import rtve
@@ -13,32 +14,31 @@ import time
 class UI(object):
 
     def __init__(self, base_url, addon_handle, args):
-        xbmc.log("plugin.video.rtve classe UI - start init() ")
+        xbmc.log("plugin.video.rtve classe UI - start init() ", xbmc.LOGDEBUG)
         addon = xbmcaddon.Addon()
-        addon_path = xbmcvfs.translatePath(addon.getAddonInfo('path'))
-        self.rtve = rtve(addon_path, addon)
+        self.rtve = rtve(addon)
         self.base_url = base_url
         self.addon_handle = addon_handle
         self.args = args
         self.mode = args.get('mode', None)
         self.url = args.get('url', [''])
-        xbmc.log("plugin.video.rtve classe UI - finish init()")
+        xbmc.log("plugin.video.rtve classe UI - finish init()", xbmc.LOGDEBUG)
 
 
     def run(self, mode, url):
-        xbmc.log("plugin.video.rtve classe UI - run()  mode = " + str(mode) + ", url " + str(url))
+        xbmc.log("plugin.video.rtve classe UI - run()  mode = " + str(mode) + ", url " + str(url), xbmc.LOGDEBUG)
 
         if mode == None:
-            xbmc.log("plugin.video.rtve classe UI - mode = None")
+            xbmc.log("plugin.video.rtve classe UI - mode = None", xbmc.LOGDEBUG)
             lFolder = self.rtve.listHome()
 
             if len(lFolder) > 0:
                 self.listFolder(lFolder)
             else:
-                xbmc.log("plugin.video.rtve - UI.run() Home - No existeixen elements")
+                xbmc.log("plugin.video.rtve - UI.run() Home - No existeixen elements", xbmc.LOGDEBUG)
 
         elif mode[0] == 'getProgrames':
-            xbmc.log("plugin.video.rtve - Programes")
+            xbmc.log("plugin.video.rtve - Programes", xbmc.LOGDEBUG)
             (folders, videos) = self.rtve.listProgrames(url[0])
             self.listFolder(folders, False)
             self.listVideos(videos)
@@ -47,7 +47,7 @@ class UI(object):
             self.playVideo(url[0])
 
     def listVideos(self, lVideos):
-        xbmc.log("plugin.video.rtve - UI - listVideos - Numero videos: " + str(len(lVideos)))
+        xbmc.log("plugin.video.rtve - UI - listVideos - Numero videos: " + str(len(lVideos)), xbmc.LOGDEBUG)
 
         for video in lVideos:
             # Create a list item with a text label
@@ -70,7 +70,7 @@ class UI(object):
             # is_folder = False means that this item won't open any sub-list.
             is_folder = False
             # Add our item to the Kodi virtual folder listing.
-            xbmc.log("plugin.video.rtve - UI - directory item " + str(url))
+            xbmc.log("plugin.video.rtve - UI - directory item " + str(url), xbmc.LOGDEBUG)
             urlPlugin = buildUrl({'mode': 'playVideo', 'url': url}, self.base_url)
 
             xbmcplugin.addDirectoryItem(self.addon_handle, urlPlugin, list_item, is_folder)
@@ -82,7 +82,7 @@ class UI(object):
         xbmcplugin.endOfDirectory(self.addon_handle)
 
     def listFolder(self, lFolderVideos, enddirectory=True):
-        xbmc.log("plugin.video.rtve classe UI - listFolder")
+        xbmc.log("plugin.video.rtve classe UI - listFolder", xbmc.LOGDEBUG)
         for folder in lFolderVideos:
 
             mode = folder.mode
@@ -109,7 +109,7 @@ class UI(object):
 
         def onPlayBackStarted(self):
             self.is_playing = True
-            xbmc.log('Playback started successfully', xbmc.LOGINFO)
+            xbmc.log('Playback started successfully', xbmc.LOGDEBUG)
 
         def onPlayBackError(self):
             self.playback_error = True
@@ -119,20 +119,20 @@ class UI(object):
             self.is_playing = False
 
     def playVideo(self,videoId):
-        xbmc.log("plugin.video.rtve -UI - playVideo " + str(videoId))
+        xbmc.log("plugin.video.rtve -UI - playVideo " + str(videoId), xbmc.LOGDEBUG)
 
         stream_url = "https://ztnr.rtve.es/ztnr/{}.mpd".format(videoId)
-        xbmc.log("plugin.video.rtve - UI - playVideo apijson url" + str(stream_url))
+        xbmc.log("plugin.video.rtve - UI - playVideo apijson url" + str(stream_url), xbmc.LOGDEBUG)
 
         license_url = ""
         try:
             tokenUrl = "https://api.rtve.es/api/token/{}".format(videoId)
             tokenJson = getJsonData(tokenUrl)
 
-            xbmc.log("plugin.video.rtve - UI - playVideo token json" + str(tokenJson))
+            xbmc.log("plugin.video.rtve - UI - playVideo token json" + str(tokenJson), xbmc.LOGDEBUG)
 
             license_url = tokenJson['widevineURL']
-            xbmc.log("plugin.video.rtve - UI - playVideo widevine url" + str(license_url))
+            xbmc.log("plugin.video.rtve - UI - playVideo widevine url" + str(license_url), xbmc.LOGDEBUG)
         except Exception as e:
             xbmc.log(f'Error playing DRM stream: {str(e)}', xbmc.LOGERROR)
 
@@ -191,7 +191,7 @@ class UI(object):
             xbmcplugin.setResolvedUrl(handle=self.addon_handle, succeeded=True, listitem=play_item)
 
             # Log success
-            xbmc.log('DRM Stream playback initiated successfully', xbmc.LOGINFO)
+            xbmc.log('DRM Stream playback initiated successfully', xbmc.LOGDEBUG)
 
         except Exception as e:
             xbmc.log(f'Error playing DRM stream: {str(e)}', xbmc.LOGERROR)

@@ -2,6 +2,7 @@ from __future__ import division
 
 import json
 from builtins import object
+from logging import DEBUG
 
 from resources.lib.video.FolderVideo import FolderVideo
 from resources.lib.utils.Utils import *
@@ -11,19 +12,18 @@ from resources.lib.video.Video import Video
 
 
 class rtve(object):
-    def __init__(self, addon_path, addon):
-        xbmc.log("plugin.video.rtve classe rtve - init() ")
-        self.addon_path = addon_path
+    def __init__(self, addon):
+        xbmc.log("plugin.video.rtve classe rtve - init() ", xbmc.LOGDEBUG)
 
     # mode = None
     def listHome(self):
-        xbmc.log("plugin.video.rtve classe rtve - listHome() ")
+        xbmc.log("plugin.video.rtve classe rtve - listHome() ", xbmc.LOGDEBUG)
         coleccions = FolderVideo('Television', "https://api.rtve.es/api/tematicas/823", "getProgrames", "",
                                  "")
         return [coleccions]
 
     def listProgrames(self, urlApi):
-        xbmc.log("plugin.video.rtve - programas " + urlApi)
+        xbmc.log("plugin.video.rtve - programas " + urlApi, xbmc.LOGDEBUG)
         folders = []
         videos = []
 
@@ -62,7 +62,7 @@ class rtve(object):
             if len(hijosItems)>0:
 
                 for item in hijosItems:
-                    xbmc.log("plugin.video.rtve - element " + str(item))
+                    xbmc.log("plugin.video.rtve - element " + str(item), xbmc.LOGDEBUG)
                     itemid = item['id']
                     programa_url = "https://www.rtve.es/api/programas/{}".format(itemid)
                     img=""
@@ -91,7 +91,7 @@ class rtve(object):
             videosItems = getJsonData(videosUrl)['page']['items']
             if len(videosItems)>0:
                 for item in videosItems:
-                    xbmc.log("plugin.video.rtve - element " + str(item))
+                    xbmc.log("plugin.video.rtve - element " + str(item), xbmc.LOGDEBUG)
                     img = item['thumbnail']
                     video = Video(item['title'], img, img, item['description'],  item['id'], "")
                     videos.append(video)

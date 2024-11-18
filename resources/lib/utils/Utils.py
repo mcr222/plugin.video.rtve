@@ -4,6 +4,9 @@ import time
 import socket
 from typing import Any, Optional, Dict
 
+import xbmc
+
+
 def buildUrl(query, base_url):
     return base_url + '?' + urllib.parse.urlencode(query)
 
@@ -48,7 +51,7 @@ def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1) -> Dict
             if is_last_attempt:
                 raise NetworkError(f"Failed to fetch data after {max_retries} attempts: {str(e)}")
             else:
-                print(error_msg)  # Log the error
+                xbmc.log(error_msg, xbmc.LOGERROR)  # Log the error
                 time.sleep(retry_delay)  # Wait before retrying
 
         except json.JSONDecodeError as e:
@@ -76,5 +79,5 @@ def safe_request(url: str) -> Optional[str]:
         with urllib.request.urlopen(req, timeout=3) as response:
             return response.read().decode('utf-8')
     except Exception as e:
-        print(f"Error making request to {url}: {str(e)}")
+        xbmc.log(f"Error making request to {url}: {str(e)}", xbmc.LOGERROR)
         return None
