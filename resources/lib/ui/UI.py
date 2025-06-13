@@ -143,7 +143,21 @@ class UI(object):
                 xbmc.Player().play(videoId)
             return
 
-        # For RTVE video IDs, construct the MPD URL and get license
+        # For RTVE video IDs, try to get direct streaming URLs first
+        direct_url = self.getRTVEDirectUrl(videoId)
+        if direct_url:
+            xbmc.log("plugin.video.rtve - UI - Found direct URL: " + direct_url, xbmc.LOGDEBUG)
+            if direct_url.lower().endswith('.mp4'):
+                self.playMP4Stream(direct_url)
+            elif direct_url.lower().endswith('.m3u8'):
+                self.playHLSStream(direct_url)
+            else:
+                # Try to play directly
+                self.playMP4Stream(direct_url)
+            return
+
+        # Fallback to DRM MPD approach if direct URL not available
+        xbmc.log("plugin.video.rtve - UI - No direct URL found, trying DRM approach", xbmc.LOGDEBUG)
         stream_url = "https://ztnr.rtve.es/ztnr/{}.mpd".format(videoId)
         xbmc.log("plugin.video.rtve - UI - MPD URL: " + str(stream_url), xbmc.LOGDEBUG)
 
@@ -152,6 +166,59 @@ class UI(object):
         
         # Play the MPD stream with DRM
         self.playMPDStream(stream_url, license_url, needs_drm=True)
+
+    def getRTVEDirectUrl(self, videoId):
+        """Get direct streaming URL for RTVE content (preferred method)"""
+        try:
+            # Try the ztnr JSON endpoint first for direct MP4 URLs
+            ztnr_url = "https://ztnr.rtve.es/ztnr/{}.json".format(videoId)
+            xbmc.log("plugin.video.rtve - UI - Trying ztnr JSON: " + ztnr_url, xbmc.LOGDEBUG)
+            
+            ztnr_data = getJsonData(ztnr_url)
+            xbmc.log("plugin.video.rtve - UI - ztnr response: " + str(ztnr_data), xbmc.LOGDEBUG)
+            
+            if isinstance(ztnr_data, list) and len(ztnr_data) > 0:
+                video_info = ztnr_data[0]
+                direct_link = video_info.get('link', '')
+                if direct_link:
+                    xbmc.log("plugin.video.rtve - UI - Found direct link: " + direct_link, xbmc.LOGDEBUG)
+                    return direct_link
+            
+        except Exception as e:
+            xbmc.log("plugin.video.rtve - UI - Error getting direct URL from ztnr: " + str(e), xbmc.LOGDEBUG)
+        
+        # Try alternative approaches if ztnr fails
+        try:
+            # Try to get video details and look for streaming URLs
+            video_url = "https://api.rtve.es/api/videos/{}".format(videoId)
+            video_data = getJsonData(video_url)
+            
+            if 'page' in video_data and 'items' in video_data['page'] and len(video_data['page']['items']) > 0:
+                video_item = video_data['page']['items'][0]
+                
+                # Look for any streaming URLs in the video data
+                def find_streaming_urls(obj):
+                    urls = []
+                    if isinstance(obj, dict):
+                        for key, value in obj.items():
+                            if isinstance(value, str) and any(ext in value.lower() for ext in ['.mp4', '.m3u8']):
+                                urls.append(value)
+                            elif isinstance(value, (dict, list)):
+                                urls.extend(find_streaming_urls(value))
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            urls.extend(find_streaming_urls(item))
+                    return urls
+                
+                streaming_urls = find_streaming_urls(video_item)
+                if streaming_urls:
+                    xbmc.log("plugin.video.rtve - UI - Found streaming URLs in video data: " + str(streaming_urls), xbmc.LOGDEBUG)
+                    return streaming_urls[0]  # Return first found URL
+                    
+        except Exception as e:
+            xbmc.log("plugin.video.rtve - UI - Error getting video details: " + str(e), xbmc.LOGDEBUG)
+        
+        return None
 
     def getRTVELicenseUrl(self, videoId):
         """Get the Widevine license URL for RTVE content"""

@@ -1,4 +1,13 @@
-﻿v1.1.0
+﻿v1.2.0
+- MAJOR FIX: Fixed video playback issues by using direct MP4 streams
+- Added intelligent stream detection using ztnr.rtve.es JSON endpoint
+- Prioritizes direct MP4 playback over DRM when possible
+- Significantly improved video compatibility across all devices
+- Fixed timeout issues with MPD streams
+- Better error handling and fallback mechanisms
+- Enhanced logging for troubleshooting
+
+v1.1.0
 - Improved video playback compatibility across different devices
 - Enhanced DRM handling with intelligent detection
 - Added support for multiple stream formats (MP4, HLS, MPD)
