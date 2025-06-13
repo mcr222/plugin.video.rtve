@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="plugin.video.rtve" name="RTVE" version="1.2.0" provider-name="mcr222">
+<addon id="plugin.video.rtve" name="RTVE" version="1.2.1" provider-name="mcr222">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.future" version="1.0.0"/>
-        <import addon="script.module.inputstreamhelper" version="0.4.2"/>
-        <import addon="script.module.beautifulsoup4" version="4.12.2"/>
+        <import addon="script.module.inputstreamhelper" version="0.3.0"/>
     </requires>
     <extension point="xbmc.python.pluginsource" library="addon.py">
         <provides>video</provides>

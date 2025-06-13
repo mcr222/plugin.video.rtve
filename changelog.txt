@@ -1,4 +1,9 @@
-﻿v1.2.0
+﻿v1.2.1
+- Fixed installation issues by removing unnecessary BeautifulSoup4 dependency
+- Lowered inputstreamhelper version requirement for better compatibility
+- Improved addon installation reliability
+
+v1.2.0
 - MAJOR FIX: Fixed video playback issues by using direct MP4 streams
 - Added intelligent stream detection using ztnr.rtve.es JSON endpoint
 - Prioritizes direct MP4 playback over DRM when possible
