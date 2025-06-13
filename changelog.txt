@@ -1,2 +1,12 @@
-﻿v1.0.0
+﻿v1.1.0
+- Improved video playback compatibility across different devices
+- Enhanced DRM handling with intelligent detection
+- Added support for multiple stream formats (MP4, HLS, MPD)
+- Improved error handling and user notifications
+- Added fallback mechanisms for devices without inputstream.adaptive
+- Better license URL handling and validation
+- Enhanced buffering settings for smoother playback
+- Fixed issues with video playback on some devices
+
+v1.0.0
 - First version
