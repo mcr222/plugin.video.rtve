@@ -118,9 +118,21 @@ class UI(object):
         def onPlayBackStopped(self):
             self.is_playing = False
 
-    def playVideo(self,videoId):
-        xbmc.log("plugin.video.rtve -UI - playVideo " + str(videoId), xbmc.LOGDEBUG)
+    def playVideo(self, videoId):
+        """Enhanced video playback with direct MP4 support"""
+        xbmc.log("plugin.video.rtve - UI - playVideo " + str(videoId), xbmc.LOGDEBUG)
 
+        # For RTVE video IDs, try to get direct streaming URLs first
+        direct_url = self.getRTVEDirectUrl(videoId)
+        if direct_url:
+            xbmc.log("plugin.video.rtve - UI - Found direct URL: " + direct_url, xbmc.LOGDEBUG)
+            # Play the direct MP4 URL
+            xbmc.Player().play(direct_url)
+            return
+
+        # Fallback to original DRM approach if direct URL not available
+        xbmc.log("plugin.video.rtve - UI - No direct URL found, trying DRM approach", xbmc.LOGDEBUG)
+        
         stream_url = "https://ztnr.rtve.es/ztnr/{}.mpd".format(videoId)
         xbmc.log("plugin.video.rtve - UI - playVideo apijson url" + str(stream_url), xbmc.LOGDEBUG)
 
@@ -128,36 +140,35 @@ class UI(object):
         try:
             tokenUrl = "https://api.rtve.es/api/token/{}".format(videoId)
             tokenJson = getJsonData(tokenUrl)
-
             xbmc.log("plugin.video.rtve - UI - playVideo token json" + str(tokenJson), xbmc.LOGDEBUG)
-
             license_url = tokenJson['widevineURL']
             xbmc.log("plugin.video.rtve - UI - playVideo widevine url" + str(license_url), xbmc.LOGDEBUG)
         except Exception as e:
-            xbmc.log(f'Error playing DRM stream: {str(e)}', xbmc.LOGERROR)
+            xbmc.log('Error getting license: ' + str(e), xbmc.LOGERROR)
 
+        # Use original DRM playback method
+        self.playDRMStream(stream_url, license_url)
 
-        from inputstreamhelper import Helper  # pylint: disable=import-outside-toplevel
-        from urllib.parse import quote
-
-        # Constants
-        PROTOCOL = 'mpd'
-        DRM = 'com.widevine.alpha'
-
-        # HTTP headers
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-            'Referer': 'https://www.rtve.es/',
-            'Origin': 'https://www.rtve.es',
-            'Accept': '*/*'
-        }
-
-        # Convert headers to Kodi format
-        headers_string = '&'.join([f'{k}={quote(v)}' for k, v in headers.items()])
-
+    def playDRMStream(self, stream_url, license_url):
+        """Play DRM protected stream using original method"""
         try:
-            # Initialize custom player
-            player = self.DRMStreamPlayer()
+            from inputstreamhelper import Helper
+            from urllib.parse import quote
+
+            # Constants
+            PROTOCOL = 'mpd'
+            DRM = 'com.widevine.alpha'
+
+            # HTTP headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+                'Referer': 'https://www.rtve.es/',
+                'Origin': 'https://www.rtve.es',
+                'Accept': '*/*'
+            }
+
+            # Convert headers to Kodi format
+            headers_string = '&'.join(['{0}={1}'.format(k, quote(v)) for k, v in headers.items()])
 
             # Create and configure the ListItem
             play_item = xbmcgui.ListItem(path=stream_url)
@@ -168,31 +179,41 @@ class UI(object):
             play_item.setProperty('inputstream.adaptive.manifest_headers', headers_string)
             play_item.setProperty('inputstream.adaptive.stream_headers', headers_string)
 
-            # Configure license key with proper formatting and increased timeout
             if license_url:
+                # Configure license key
+                license_key = '{0}|{1}|R{{SSM}}|'.format(license_url, headers_string)
                 play_item.setProperty('inputstream.adaptive.license_type', DRM)
-                play_item.setProperty('inputstream.adaptive.license_key', license_url)
-
-            # Set additional properties
-            play_item.setMimeType('application/dash+xml')
-            play_item.setContentLookup(False)
-
-            # Add properties to help with buffering
-            play_item.setProperty('inputstream.adaptive.stream_selection_type', 'adaptive')
-
-            # Adjust these buffering settings
-            play_item.setProperty('inputstream.adaptive.stream_buffer_size', '524288')  # Doubled buffer
-            play_item.setProperty('inputstream.adaptive.initial_buffer_duration', '15')
-            play_item.setProperty('inputstream.adaptive.persistent_storage', 'true')
-            play_item.setProperty('inputstream.adaptive.max_bandwidth', '20000000')
-            play_item.setProperty('inputstream.adaptive.min_bandwidth', '500000')
+                play_item.setProperty('inputstream.adaptive.license_key', license_key)
 
             # Start playback
-            xbmcplugin.setResolvedUrl(handle=self.addon_handle, succeeded=True, listitem=play_item)
-
-            # Log success
-            xbmc.log('DRM Stream playback initiated successfully', xbmc.LOGDEBUG)
+            xbmc.Player().play(stream_url, play_item)
 
         except Exception as e:
-            xbmc.log(f'Error playing DRM stream: {str(e)}', xbmc.LOGERROR)
-            xbmcgui.Dialog().notification('Error', 'Failed to play DRM stream', xbmcgui.NOTIFICATION_ERROR)
+            xbmc.log('Error playing DRM stream: ' + str(e), xbmc.LOGERROR)
+            # Fallback to simple playback
+            xbmc.Player().play(stream_url)
+
+    def getRTVEDirectUrl(self, videoId):
+        """Get direct streaming URL for RTVE content"""
+        try:
+            # Try the ztnr JSON endpoint for direct MP4 URLs
+            ztnr_url = "https://ztnr.rtve.es/ztnr/{}.json".format(videoId)
+            xbmc.log("plugin.video.rtve - UI - Trying ztnr JSON: " + ztnr_url, xbmc.LOGDEBUG)
+            
+            ztnr_data = getJsonData(ztnr_url)
+            xbmc.log("plugin.video.rtve - UI - ztnr response: " + str(ztnr_data), xbmc.LOGDEBUG)
+            
+            if isinstance(ztnr_data, list) and len(ztnr_data) > 0:
+                video_info = ztnr_data[0]
+                direct_link = video_info.get('link', '')
+                if direct_link:
+                    xbmc.log("plugin.video.rtve - UI - Found direct link: " + direct_link, xbmc.LOGDEBUG)
+                    return direct_link
+            
+        except Exception as e:
+            xbmc.log("plugin.video.rtve - UI - Error getting direct URL: " + str(e), xbmc.LOGDEBUG)
+        
+        return None
+
+
+
