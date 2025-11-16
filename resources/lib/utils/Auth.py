@@ -191,19 +191,19 @@ class RTVEAuth:
                 
                 # Extract CSRF token or other required fields from the login page
                 csrf_token = None
+                form_action = None
                 csrf_match = re.search(r'name=["\']_token["\'] value=["\']([^"\']+)["\']', login_page_content)
                 if csrf_match:
                     csrf_token = csrf_match.group(1)
                     xbmc.log(f"plugin.video.rtve - Found CSRF token: {csrf_token[:10]}...", xbmc.LOGDEBUG)
-                    
-                    # Look for other form fields that might be required
-                    form_action = None
-                    action_match = re.search(r'<form[^>]*action=["\']([^"\']+)["\']', login_page_content)
-                    if action_match:
-                        form_action = action_match.group(1)
-                        if form_action.startswith('/'):
-                            form_action = 'https://secure2.rtve.es' + form_action
-                        xbmc.log(f"plugin.video.rtve - Found form action: {form_action}", xbmc.LOGDEBUG)
+                
+                # Look for form action regardless of CSRF token presence
+                action_match = re.search(r'<form[^>]*action=["\']([^"\']+)["\']', login_page_content)
+                if action_match:
+                    form_action = action_match.group(1)
+                    if form_action.startswith('/'):
+                        form_action = 'https://secure2.rtve.es' + form_action
+                    xbmc.log(f"plugin.video.rtve - Found form action: {form_action}", xbmc.LOGDEBUG)
                         
             except Exception as e:
                 xbmc.log(f"plugin.video.rtve - Error getting login page: {str(e)}", xbmc.LOGDEBUG)
