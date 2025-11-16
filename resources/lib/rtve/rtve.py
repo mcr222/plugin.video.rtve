@@ -20,15 +20,22 @@ class rtve(object):
         xbmc.log("plugin.video.rtve classe rtve - listHome() ", xbmc.LOGDEBUG)
         folders = []
         
-        # Add login option if not logged in
+        # Add authentication options
         try:
             from resources.lib.utils.Auth import RTVEAuth
             auth = RTVEAuth()
             if not auth.is_logged_in():
                 login_folder = FolderVideo('Login to RTVE Play', "login", "login", "", "")
                 folders.append(login_folder)
+            else:
+                logout_folder = FolderVideo('Logout from RTVE Play', "logout", "logout", "", "")
+                folders.append(logout_folder)
         except Exception as e:
             xbmc.log(f"plugin.video.rtve - Error checking login status: {str(e)}", xbmc.LOGDEBUG)
+        
+        # Add debug option
+        debug_folder = FolderVideo('Debug Authentication', "debug", "debug", "", "")
+        folders.append(debug_folder)
         
         coleccions = FolderVideo('Television', "https://api.rtve.es/api/tematicas/823", "getProgrames", "",
                                  "")
