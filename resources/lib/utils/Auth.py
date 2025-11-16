@@ -180,7 +180,11 @@ class RTVEAuth:
             gigya_api_key = None
             
             try:
-                login_page_content = self._make_request(login_page_url, timeout=10)
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                }
+                login_page_content = self._make_request(login_page_url, headers=headers, timeout=6)
                 if not login_page_content:
                     xbmc.log("plugin.video.rtve - Failed to retrieve login page", xbmc.LOGERROR)
                     return False
@@ -260,12 +264,13 @@ class RTVEAuth:
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
                 'Referer': 'https://www.rtve.es/usuarios/acceso/login/',
-                'Origin': 'https://www.rtve.es'
+                'Origin': 'https://www.rtve.es',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
             
             data = urllib.parse.urlencode(login_data).encode('utf-8')
             
-            response_text = self._make_request(gigya_login_url, data=data, headers=headers, timeout=15)
+            response_text = self._make_request(gigya_login_url, data=data, headers=headers, timeout=10)
             
             if not response_text:
                 return False
@@ -326,7 +331,8 @@ class RTVEAuth:
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
                 'Referer': 'https://www.rtve.es/usuarios/acceso/login/',
-                'Origin': 'https://www.rtve.es'
+                'Origin': 'https://www.rtve.es',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
             
             data = urllib.parse.urlencode(login_data).encode('utf-8')
@@ -338,7 +344,7 @@ class RTVEAuth:
                 gigya_login_url = f"https://accounts.{data_center}/accounts.login"
                 xbmc.log(f"plugin.video.rtve - Trying Gigya data center: {data_center}", xbmc.LOGDEBUG)
                 
-                response_text = self._make_request(gigya_login_url, data=data, headers=headers, timeout=15)
+                response_text = self._make_request(gigya_login_url, data=data, headers=headers, timeout=8)
                 
                 if not response_text:
                     xbmc.log(f"plugin.video.rtve - No response from {data_center}, trying next data center", xbmc.LOGDEBUG)
@@ -471,18 +477,20 @@ class RTVEAuth:
                                 'Accept': 'application/json',
                                 'Referer': 'https://www.rtve.es/usuarios/acceso/login/',
                                 'Origin': 'https://www.rtve.es',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
                         else:
                             data = urllib.parse.urlencode(login_data).encode('utf-8')
                             headers = {
                                 'Content-Type': 'application/x-www-form-urlencoded',
-                                'Accept': 'application/json, text/html, */*',
+                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                                 'Referer': 'https://www.rtve.es/usuarios/acceso/login/',
-                                'Origin': 'https://www.rtve.es'
+                                'Origin': 'https://www.rtve.es',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                             }
                         
-                        response_text = self._make_request(login_url, data=data, headers=headers, timeout=15, max_retries=2)
+                        response_text = self._make_request(login_url, data=data, headers=headers, timeout=8, max_retries=1)
                         
                         if not response_text:
                             continue
@@ -521,7 +529,11 @@ class RTVEAuth:
         try:
             # Get the login page to look for CSRF tokens
             if 'api' not in login_url:  # Only for HTML pages, not API endpoints
-                page_content = self._make_request(login_url, timeout=10, max_retries=1)
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                }
+                page_content = self._make_request(login_url, headers=headers, timeout=6, max_retries=1)
                 if page_content:
                     # Look for common CSRF token patterns
                     csrf_patterns = [
