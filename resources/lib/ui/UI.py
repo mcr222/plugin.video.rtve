@@ -15,8 +15,8 @@ class UI(object):
 
     def __init__(self, base_url, addon_handle, args):
         xbmc.log("plugin.video.rtve classe UI - start init() ", xbmc.LOGDEBUG)
-        addon = xbmcaddon.Addon()
-        self.rtve = rtve(addon)
+        self.addon = xbmcaddon.Addon()
+        self.rtve = rtve(self.addon)
         self.base_url = base_url
         self.addon_handle = addon_handle
         self.args = args
@@ -45,6 +45,9 @@ class UI(object):
 
         elif mode[0] == 'playVideo':
             self.playVideo(url[0])
+        
+        elif mode[0] == 'login':
+            self.handleLogin()
 
     def listVideos(self, lVideos):
         xbmc.log("plugin.video.rtve - UI - listVideos - Numero videos: " + str(len(lVideos)), xbmc.LOGDEBUG)
@@ -118,6 +121,52 @@ class UI(object):
         def onPlayBackStopped(self):
             self.is_playing = False
 
+    def handleLogin(self):
+        """Handle login action - prompt for credentials"""
+        try:
+            from resources.lib.utils.Auth import RTVEAuth
+            
+            # Prompt for username
+            keyboard = xbmc.Keyboard('', 'Enter RTVE Play Username')
+            keyboard.doModal()
+            if not keyboard.isConfirmed():
+                return
+            username = keyboard.getText()
+            
+            if not username:
+                xbmcgui.Dialog().ok('RTVE Login', 'Username is required.')
+                return
+            
+            # Prompt for password
+            keyboard = xbmc.Keyboard('', 'Enter RTVE Play Password', hidden=True)
+            keyboard.doModal()
+            if not keyboard.isConfirmed():
+                return
+            password = keyboard.getText()
+            
+            if not password:
+                xbmcgui.Dialog().ok('RTVE Login', 'Password is required.')
+                return
+            
+            xbmcgui.Dialog().notification('RTVE', 'Logging in...', xbmcgui.NOTIFICATION_INFO)
+            auth = RTVEAuth()
+            if auth.login(username, password):
+                xbmcgui.Dialog().ok(
+                    'RTVE Login',
+                    'Login successful! You can now play videos.'
+                )
+            else:
+                xbmcgui.Dialog().ok(
+                    'RTVE Login',
+                    'Login failed. Please check your username and password.'
+                )
+        except Exception as e:
+            xbmc.log(f'Error during login: {str(e)}', xbmc.LOGERROR)
+            xbmcgui.Dialog().ok(
+                'RTVE Login',
+                f'Error: {str(e)}'
+            )
+
     def playVideo(self,videoId):
         xbmc.log("plugin.video.rtve -UI - playVideo " + str(videoId), xbmc.LOGDEBUG)
 
@@ -135,6 +184,13 @@ class UI(object):
             xbmc.log("plugin.video.rtve - UI - playVideo widevine url" + str(license_url), xbmc.LOGDEBUG)
         except Exception as e:
             xbmc.log(f'Error playing DRM stream: {str(e)}', xbmc.LOGERROR)
+            # Check if it's an authentication error
+            error_msg = str(e).lower()
+            if '401' in error_msg or '403' in error_msg or 'unauthorized' in error_msg:
+                xbmcgui.Dialog().ok(
+                    'RTVE Playback Error',
+                    'Authentication required. Please login in addon settings.'
+                )
 
 
         from inputstreamhelper import Helper  # pylint: disable=import-outside-toplevel
@@ -144,16 +200,27 @@ class UI(object):
         PROTOCOL = 'mpd'
         DRM = 'com.widevine.alpha'
 
-        # HTTP headers
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-            'Referer': 'https://www.rtve.es/',
-            'Origin': 'https://www.rtve.es',
-            'Accept': '*/*'
-        }
+        # Get authentication headers
+        auth = None
+        try:
+            from resources.lib.utils.Auth import RTVEAuth
+            auth = RTVEAuth()
+            headers = auth.get_auth_headers()
+        except Exception as e:
+            xbmc.log(f'Error getting auth headers: {str(e)}', xbmc.LOGDEBUG)
+            # Fallback to default headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+                'Referer': 'https://www.rtve.es/',
+                'Origin': 'https://www.rtve.es',
+                'Accept': '*/*'
+            }
 
         # Convert headers to Kodi format
         headers_string = '&'.join([f'{k}={quote(v)}' for k, v in headers.items()])
+        
+        # Build license key URL with authentication headers
+        license_key_url = license_url
 
         try:
             # Initialize custom player
@@ -171,7 +238,17 @@ class UI(object):
             # Configure license key with proper formatting and increased timeout
             if license_url:
                 play_item.setProperty('inputstream.adaptive.license_type', DRM)
-                play_item.setProperty('inputstream.adaptive.license_key', license_url)
+                play_item.setProperty('inputstream.adaptive.license_key', license_key_url)
+                
+                # Add authentication headers to license request
+                # inputstream.adaptive supports license_headers property
+                if auth and auth.get_cookie_string():
+                    license_headers = headers.copy()
+                    # Ensure cookies are included
+                    if 'Cookie' in license_headers:
+                        license_headers_string = '&'.join([f'{k}={quote(v)}' for k, v in license_headers.items()])
+                        play_item.setProperty('inputstream.adaptive.license_headers', license_headers_string)
+                        xbmc.log("plugin.video.rtve - Added authentication headers to license request", xbmc.LOGDEBUG)
 
             # Set additional properties
             play_item.setMimeType('application/dash+xml')
