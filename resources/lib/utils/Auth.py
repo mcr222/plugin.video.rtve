@@ -207,6 +207,15 @@ class RTVEAuth:
             
             # Step 2: Authenticate with Gigya
             if gigya_api_key:
+                # Try using stored data center first if available
+                stored_data_center = self.session_cookies.get('gigya_data_center')
+                if stored_data_center:
+                    xbmc.log(f"plugin.video.rtve - Using previously successful data center: {stored_data_center}", xbmc.LOGDEBUG)
+                    if self._gigya_login_single_datacenter(gigya_api_key, username, password, stored_data_center):
+                        return True
+                    else:
+                        xbmc.log("plugin.video.rtve - Stored data center failed, trying all data centers", xbmc.LOGDEBUG)
+                
                 return self._gigya_login(gigya_api_key, username, password)
             else:
                 xbmc.log("plugin.video.rtve - No Gigya API key found, trying fallback methods", xbmc.LOGWARNING)
@@ -216,21 +225,21 @@ class RTVEAuth:
             xbmc.log(f"plugin.video.rtve - Login error: {str(e)}", xbmc.LOGERROR)
             return False
     
-    def _gigya_login(self, api_key: str, username: str, password: str) -> bool:
+    def _gigya_login_single_datacenter(self, api_key: str, username: str, password: str, data_center: str) -> bool:
         """
-        Perform Gigya authentication
+        Perform Gigya authentication using a specific data center
         
         Args:
             api_key: Gigya API key
             username: Username/email
             password: Password
+            data_center: Specific data center to use (e.g., 'eu1.gigya.com')
             
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Gigya login endpoint
-            gigya_login_url = "https://accounts.gigya.com/accounts.login"
+            gigya_login_url = f"https://accounts.{data_center}/accounts.login"
             
             # Prepare login data for Gigya
             login_data = {
@@ -250,38 +259,128 @@ class RTVEAuth:
             
             data = urllib.parse.urlencode(login_data).encode('utf-8')
             
-            xbmc.log("plugin.video.rtve - Attempting Gigya authentication", xbmc.LOGDEBUG)
             response_text = self._make_request(gigya_login_url, data=data, headers=headers, timeout=15)
             
             if not response_text:
-                xbmc.log("plugin.video.rtve - Gigya login request failed", xbmc.LOGERROR)
                 return False
             
             # Parse Gigya response
             try:
                 response_data = json.loads(response_text)
-                xbmc.log(f"plugin.video.rtve - Gigya response status: {response_data.get('errorCode', 'unknown')}", xbmc.LOGDEBUG)
+                error_code = response_data.get('errorCode', 'unknown')
                 
-                if response_data.get('errorCode') == 0:
+                if error_code == 0:
                     # Successful login
                     session_token = response_data.get('sessionInfo', {}).get('sessionToken')
                     if session_token:
-                        xbmc.log("plugin.video.rtve - Gigya login successful", xbmc.LOGDEBUG)
-                        # Store session token for future use
+                        xbmc.log(f"plugin.video.rtve - Gigya login successful using stored data center: {data_center}", xbmc.LOGINFO)
+                        # Store session token
                         self.session_cookies['gigya_session'] = session_token
                         self._save_cookies()
                         return True
-                    else:
-                        xbmc.log("plugin.video.rtve - No session token in Gigya response", xbmc.LOGWARNING)
-                        return False
-                else:
-                    error_msg = response_data.get('errorMessage', 'Unknown error')
-                    xbmc.log(f"plugin.video.rtve - Gigya login failed: {error_msg}", xbmc.LOGERROR)
-                    return False
+                
+                return False
                     
             except json.JSONDecodeError:
-                xbmc.log("plugin.video.rtve - Invalid JSON response from Gigya", xbmc.LOGERROR)
                 return False
+                
+        except Exception:
+            return False
+    
+    def _gigya_login(self, api_key: str, username: str, password: str) -> bool:
+        """
+        Perform Gigya authentication with automatic data center detection
+        
+        Args:
+            api_key: Gigya API key
+            username: Username/email
+            password: Password
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Gigya data centers to try (EU first for RTVE, then US, then AU)
+            data_centers = [
+                'eu1.gigya.com',  # European data center (most likely for RTVE)
+                'us1.gigya.com',  # US data center
+                'au1.gigya.com'   # Australian data center
+            ]
+            
+            # Prepare login data for Gigya
+            login_data = {
+                'apiKey': api_key,
+                'loginID': username,
+                'password': password,
+                'format': 'json',
+                'httpStatusCodes': 'false'
+            }
+            
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+                'Referer': 'https://secure2.rtve.es/usuarios/acceso/login/',
+                'Origin': 'https://secure2.rtve.es'
+            }
+            
+            data = urllib.parse.urlencode(login_data).encode('utf-8')
+            
+            xbmc.log("plugin.video.rtve - Attempting Gigya authentication with data center detection", xbmc.LOGDEBUG)
+            
+            # Try each data center until we find the correct one
+            for data_center in data_centers:
+                gigya_login_url = f"https://accounts.{data_center}/accounts.login"
+                xbmc.log(f"plugin.video.rtve - Trying Gigya data center: {data_center}", xbmc.LOGDEBUG)
+                
+                response_text = self._make_request(gigya_login_url, data=data, headers=headers, timeout=15)
+                
+                if not response_text:
+                    xbmc.log(f"plugin.video.rtve - No response from {data_center}, trying next data center", xbmc.LOGDEBUG)
+                    continue
+                
+                # Parse Gigya response
+                try:
+                    response_data = json.loads(response_text)
+                    error_code = response_data.get('errorCode', 'unknown')
+                    xbmc.log(f"plugin.video.rtve - Gigya response from {data_center} - status: {error_code}", xbmc.LOGDEBUG)
+                    
+                    # Check if this is the wrong data center
+                    if error_code == 301001:
+                        xbmc.log(f"plugin.video.rtve - Data center {data_center} is invalid for this API key, trying next", xbmc.LOGDEBUG)
+                        continue
+                    
+                    if error_code == 0:
+                        # Successful login
+                        session_token = response_data.get('sessionInfo', {}).get('sessionToken')
+                        if session_token:
+                            xbmc.log(f"plugin.video.rtve - Gigya login successful using data center: {data_center}", xbmc.LOGINFO)
+                            # Store session token and data center for future use
+                            self.session_cookies['gigya_session'] = session_token
+                            self.session_cookies['gigya_data_center'] = data_center
+                            self._save_cookies()
+                            return True
+                        else:
+                            xbmc.log(f"plugin.video.rtve - No session token in response from {data_center}", xbmc.LOGWARNING)
+                            continue
+                    else:
+                        # Other error - could be credentials issue, log and try next data center
+                        error_msg = response_data.get('errorMessage', 'Unknown error')
+                        xbmc.log(f"plugin.video.rtve - Gigya error from {data_center}: {error_msg} (code: {error_code})", xbmc.LOGWARNING)
+                        
+                        # If it's a credential error, don't try other data centers
+                        if error_code in [403005, 403042, 403043]:  # Invalid credentials errors
+                            xbmc.log("plugin.video.rtve - Invalid credentials, not trying other data centers", xbmc.LOGERROR)
+                            return False
+                        
+                        continue
+                        
+                except json.JSONDecodeError:
+                    xbmc.log(f"plugin.video.rtve - Invalid JSON response from {data_center}", xbmc.LOGWARNING)
+                    continue
+            
+            # If we get here, none of the data centers worked
+            xbmc.log("plugin.video.rtve - Failed to authenticate with any Gigya data center", xbmc.LOGERROR)
+            return False
                 
         except Exception as e:
             xbmc.log(f"plugin.video.rtve - Gigya login error: {str(e)}", xbmc.LOGERROR)
