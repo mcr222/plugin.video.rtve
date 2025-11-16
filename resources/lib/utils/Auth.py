@@ -163,7 +163,7 @@ class RTVEAuth:
     
     def login(self, username: str, password: str) -> bool:
         """
-        Login to RTVE Play using the current authentication system
+        Login to RTVE Play using Gigya authentication system
         
         Args:
             username: RTVE Play username/email
@@ -173,221 +173,223 @@ class RTVEAuth:
             True if login successful, False otherwise
         """
         try:
-            xbmc.log("plugin.video.rtve - Attempting RTVE Play login", xbmc.LOGDEBUG)
+            xbmc.log("plugin.video.rtve - Attempting RTVE Play login via Gigya", xbmc.LOGDEBUG)
             
-            # Create opener with cookie handler
-            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookie_jar))
-            
-            # Step 1: Visit the main login page to get initial cookies and CSRF tokens
+            # Step 1: Get Gigya API key from login page
             login_page_url = "https://secure2.rtve.es/usuarios/acceso/login/"
-            
-            # Initialize variables outside try block to ensure they're always available
-            csrf_token = None
-            form_action = None
+            gigya_api_key = None
             
             try:
-                login_page_content = self._make_request(login_page_url)
+                login_page_content = self._make_request(login_page_url, timeout=10)
                 if not login_page_content:
                     xbmc.log("plugin.video.rtve - Failed to retrieve login page", xbmc.LOGERROR)
                     return False
                 
                 xbmc.log("plugin.video.rtve - Retrieved login page", xbmc.LOGDEBUG)
                 
-                # Extract CSRF token or other required fields from the login page
-                csrf_match = re.search(r'name=["\']_token["\'] value=["\']([^"\']+)["\']', login_page_content)
-                if csrf_match:
-                    csrf_token = csrf_match.group(1)
-                    xbmc.log(f"plugin.video.rtve - Found CSRF token: {csrf_token[:10]}...", xbmc.LOGDEBUG)
+                # Extract Gigya API key (handle HTML entities)
+                import html
+                gigya_match = re.search(r'gigyaApikey&quot;:&quot;([^&]+)&quot;', login_page_content)
+                if not gigya_match:
+                    # Try alternative patterns
+                    gigya_match = re.search(r'gigyaApikey["\']:\s*["\']([^"\']+)["\']', login_page_content)
                 
-                # Look for form action regardless of CSRF token presence
-                action_match = re.search(r'<form[^>]*action=["\']([^"\']+)["\']', login_page_content)
-                if action_match:
-                    form_action = action_match.group(1)
-                    if form_action.startswith('/'):
-                        form_action = 'https://secure2.rtve.es' + form_action
-                    xbmc.log(f"plugin.video.rtve - Found form action: {form_action}", xbmc.LOGDEBUG)
+                if gigya_match:
+                    gigya_api_key = html.unescape(gigya_match.group(1))
+                    xbmc.log(f"plugin.video.rtve - Found Gigya API key: {gigya_api_key[:10]}...", xbmc.LOGDEBUG)
+                else:
+                    xbmc.log("plugin.video.rtve - Could not find Gigya API key", xbmc.LOGWARNING)
+                    return False
                         
             except Exception as e:
-                xbmc.log(f"plugin.video.rtve - Error getting login page: {str(e)}", xbmc.LOGDEBUG)
-                # Continue with fallback approach
-                csrf_token = None
-                form_action = None
+                xbmc.log(f"plugin.video.rtve - Error getting login page: {str(e)}", xbmc.LOGERROR)
+                return False
             
-            # Step 2: Try different login endpoints and methods
+            # Step 2: Authenticate with Gigya
+            if gigya_api_key:
+                return self._gigya_login(gigya_api_key, username, password)
+            else:
+                xbmc.log("plugin.video.rtve - No Gigya API key found, trying fallback methods", xbmc.LOGWARNING)
+                return self._fallback_login(username, password)
+                
+        except Exception as e:
+            xbmc.log(f"plugin.video.rtve - Login error: {str(e)}", xbmc.LOGERROR)
+            return False
+    
+    def _gigya_login(self, api_key: str, username: str, password: str) -> bool:
+        """
+        Perform Gigya authentication
+        
+        Args:
+            api_key: Gigya API key
+            username: Username/email
+            password: Password
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Gigya login endpoint
+            gigya_login_url = "https://accounts.gigya.com/accounts.login"
+            
+            # Prepare login data for Gigya
+            login_data = {
+                'apiKey': api_key,
+                'loginID': username,
+                'password': password,
+                'format': 'json',
+                'httpStatusCodes': 'false'
+            }
+            
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+                'Referer': 'https://secure2.rtve.es/usuarios/acceso/login/',
+                'Origin': 'https://secure2.rtve.es'
+            }
+            
+            data = urllib.parse.urlencode(login_data).encode('utf-8')
+            
+            xbmc.log("plugin.video.rtve - Attempting Gigya authentication", xbmc.LOGDEBUG)
+            response_text = self._make_request(gigya_login_url, data=data, headers=headers, timeout=15)
+            
+            if not response_text:
+                xbmc.log("plugin.video.rtve - Gigya login request failed", xbmc.LOGERROR)
+                return False
+            
+            # Parse Gigya response
+            try:
+                response_data = json.loads(response_text)
+                xbmc.log(f"plugin.video.rtve - Gigya response status: {response_data.get('errorCode', 'unknown')}", xbmc.LOGDEBUG)
+                
+                if response_data.get('errorCode') == 0:
+                    # Successful login
+                    session_token = response_data.get('sessionInfo', {}).get('sessionToken')
+                    if session_token:
+                        xbmc.log("plugin.video.rtve - Gigya login successful", xbmc.LOGDEBUG)
+                        # Store session token for future use
+                        self.session_cookies['gigya_session'] = session_token
+                        self._save_cookies()
+                        return True
+                    else:
+                        xbmc.log("plugin.video.rtve - No session token in Gigya response", xbmc.LOGWARNING)
+                        return False
+                else:
+                    error_msg = response_data.get('errorMessage', 'Unknown error')
+                    xbmc.log(f"plugin.video.rtve - Gigya login failed: {error_msg}", xbmc.LOGERROR)
+                    return False
+                    
+            except json.JSONDecodeError:
+                xbmc.log("plugin.video.rtve - Invalid JSON response from Gigya", xbmc.LOGERROR)
+                return False
+                
+        except Exception as e:
+            xbmc.log(f"plugin.video.rtve - Gigya login error: {str(e)}", xbmc.LOGERROR)
+            return False
+    
+    def _fallback_login(self, username: str, password: str) -> bool:
+        """
+        Fallback login method for when Gigya is not available
+        
+        Args:
+            username: Username/email
+            password: Password
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            xbmc.log("plugin.video.rtve - Trying fallback login methods", xbmc.LOGDEBUG)
+            
+            # Try a few key endpoints with reduced timeout
             login_endpoints = [
-                form_action if form_action else "https://secure2.rtve.es/usuarios/acceso/login/",
                 "https://secure2.rtve.es/usuarios/acceso/login/",
-                "https://www.rtve.es/usuarios/acceso/login",
-                "https://extapp.rtve.es/idp/login.html",
-                "https://extra.rtve.es/idp/login.html",
-                "https://api.rtve.es/api/login",
                 "https://www.rtve.es/api/login"
             ]
             
             for login_url in login_endpoints:
                 try:
-                    xbmc.log(f"plugin.video.rtve - Trying login endpoint: {login_url}", xbmc.LOGDEBUG)
+                    xbmc.log(f"plugin.video.rtve - Trying fallback endpoint: {login_url}", xbmc.LOGDEBUG)
                     
-                    # Prepare different login data formats
-                    login_data_formats = []
-                    
-                    # Standard form data with CSRF token if available
-                    base_data = {'username': username, 'password': password}
-                    if csrf_token:
-                        base_data['_token'] = csrf_token
-                    login_data_formats.append(base_data)
-                    
-                    # Alternative field names
-                    login_data_formats.extend([
-                        {'email': username, 'password': password, '_token': csrf_token} if csrf_token else {'email': username, 'password': password},
-                        {'user': username, 'pass': password, '_token': csrf_token} if csrf_token else {'user': username, 'pass': password},
-                        {'login': username, 'password': password, '_token': csrf_token} if csrf_token else {'login': username, 'password': password},
-                        {'usuario': username, 'clave': password, '_token': csrf_token} if csrf_token else {'usuario': username, 'clave': password},
-                        # OAuth-style
-                        {'username': username, 'password': password, 'grant_type': 'password'},
-                        # JSON format
-                        {'username': username, 'password': password, 'remember': True}
-                    ])
+                    # Try only the most common data formats
+                    login_data_formats = [
+                        {'username': username, 'password': password},
+                        {'email': username, 'password': password}
+                    ]
                     
                     for login_data in login_data_formats:
                         try:
-                            # Try both form-encoded and JSON requests
-                            for content_type in ['application/x-www-form-urlencoded', 'application/json']:
-                                try:
-                                    if content_type == 'application/json':
-                                        data = json.dumps(login_data).encode('utf-8')
-                                    else:
-                                        data = urllib.parse.urlencode(login_data).encode('utf-8')
-                                    
-                                    headers = {
-                                        'Content-Type': content_type,
-                                        'Accept': 'application/json, text/html, */*',
-                                        'Referer': 'https://secure2.rtve.es/usuarios/acceso/login/',
-                                        'Origin': 'https://secure2.rtve.es',
-                                        'X-Requested-With': 'XMLHttpRequest' if content_type == 'application/json' else None
-                                    }
-                                    
-                                    # Remove None values
-                                    headers = {k: v for k, v in headers.items() if v is not None}
-                                    
-                                    # Perform login with robust request method
-                                    response_text = self._make_request(login_url, data=data, headers=headers)
-                                    
-                                    if not response_text:
-                                        xbmc.log(f"plugin.video.rtve - Login request failed with {content_type}", xbmc.LOGDEBUG)
-                                        continue
-                                        
-                                    xbmc.log(f"plugin.video.rtve - Login response received with {content_type}", xbmc.LOGDEBUG)
-                                    
-                                    # Check for successful login indicators
-                                    success_indicators = [
-                                        'dashboard', 'perfil', 'cuenta', 'logout', 'cerrar sesion',
-                                        'access_token', 'token', 'success', 'usuario', 'bienvenido',
-                                        'welcome', 'profile', 'account'
-                                    ]
-                                    
-                                    # Check for error indicators
-                                    error_indicators = [
-                                        'error', 'incorrecto', 'invalid', 'failed', 'denied',
-                                        'usuario no encontrado', 'contraseña incorrecta'
-                                    ]
-                                    
-                                    response_lower = response_text.lower()
-                                    has_success = any(indicator in response_lower for indicator in success_indicators)
-                                    has_error = any(indicator in response_lower for indicator in error_indicators)
-                                    
-                                    # Try to parse as JSON for structured response
-                                    try:
-                                        response_data = json.loads(response_text)
-                                        xbmc.log(f"plugin.video.rtve - JSON response: {response_data}", xbmc.LOGDEBUG)
-                                        
-                                        # Check JSON response for success
-                                        if (response_data.get('success') or 
-                                            response_data.get('token') or 
-                                            response_data.get('access_token') or
-                                            response_data.get('user')):
-                                            has_success = True
-                                        elif (response_data.get('error') or 
-                                              response_data.get('message', '').lower().find('error') != -1):
-                                            has_error = True
-                                    except:
-                                        pass
-                                    
-                                    # Check if login was successful
-                                    if (response.status in [200, 302] and has_success and not has_error) or response.status == 302:
-                                        # Update session cookies
-                                        for cookie in self.cookie_jar:
-                                            self.session_cookies[cookie.name] = cookie.value
-                                        
-                                        self._save_cookies()
-                                        xbmc.log("plugin.video.rtve - Login successful!", xbmc.LOGINFO)
-                                        return True
-                                    
-                                    # If we got a redirect, follow it
-                                    if response.status == 302:
-                                        redirect_url = response.headers.get('Location')
-                                        if redirect_url:
-                                            xbmc.log(f"plugin.video.rtve - Following redirect to: {redirect_url}", xbmc.LOGDEBUG)
-                                            # This might indicate successful login
-                                            for cookie in self.cookie_jar:
-                                                self.session_cookies[cookie.name] = cookie.value
-                                            self._save_cookies()
-                                            return True
-                                        
-                                except urllib.error.HTTPError as e:
-                                    if e.code == 302:  # Redirect might indicate success
-                                        for cookie in self.cookie_jar:
-                                            self.session_cookies[cookie.name] = cookie.value
-                                        self._save_cookies()
-                                        xbmc.log("plugin.video.rtve - Login successful (redirect)", xbmc.LOGINFO)
-                                        return True
-                                    elif e.code not in [404, 405, 400]:  # Skip common errors
-                                        xbmc.log(f"plugin.video.rtve - HTTP {e.code} for {login_url}", xbmc.LOGDEBUG)
-                                    continue
-                                except Exception as e:
-                                    xbmc.log(f"plugin.video.rtve - Error with content type {content_type}: {str(e)}", xbmc.LOGDEBUG)
-                                    continue
-                                    
+                            data = urllib.parse.urlencode(login_data).encode('utf-8')
+                            headers = {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'Accept': 'application/json, text/html, */*',
+                                'Referer': 'https://secure2.rtve.es/usuarios/acceso/login/',
+                                'Origin': 'https://secure2.rtve.es'
+                            }
+                            
+                            # Use shorter timeout for fallback
+                            response_text = self._make_request(login_url, data=data, headers=headers, timeout=10, max_retries=1)
+                            
+                            if not response_text:
+                                continue
+                                
+                            # Check for successful login indicators
+                            success_indicators = [
+                                'dashboard', 'perfil', 'cuenta', 'logout', 'cerrar sesion',
+                                'access_token', 'token', 'success', 'usuario', 'bienvenido',
+                                'welcome', 'profile', 'account'
+                            ]
+                            
+                            # Check for error indicators
+                            error_indicators = [
+                                'error', 'incorrecto', 'invalid', 'failed', 'denied',
+                                'usuario no encontrado', 'contraseña incorrecta'
+                            ]
+                            
+                            response_lower = response_text.lower()
+                            has_success = any(indicator in response_lower for indicator in success_indicators)
+                            has_error = any(indicator in response_lower for indicator in error_indicators)
+                            
+                            # Try to parse as JSON for structured response
+                            try:
+                                response_data = json.loads(response_text)
+                                xbmc.log(f"plugin.video.rtve - JSON response received", xbmc.LOGDEBUG)
+                                
+                                # Check JSON response for success
+                                if (response_data.get('success') or 
+                                    response_data.get('token') or 
+                                    response_data.get('access_token') or
+                                    response_data.get('user')):
+                                    has_success = True
+                                elif (response_data.get('error') or 
+                                      response_data.get('message', '').lower().find('error') != -1):
+                                    has_error = True
+                            except:
+                                pass
+                            
+                            # Check if login was successful
+                            if has_success and not has_error:
+                                # Update session cookies
+                                for cookie in self.cookie_jar:
+                                    self.session_cookies[cookie.name] = cookie.value
+                                
+                                self._save_cookies()
+                                xbmc.log("plugin.video.rtve - Fallback login successful!", xbmc.LOGINFO)
+                                return True
+                                
                         except Exception as e:
-                            xbmc.log(f"plugin.video.rtve - Error trying login data format: {str(e)}", xbmc.LOGDEBUG)
+                            xbmc.log(f"plugin.video.rtve - Error with fallback login: {str(e)}", xbmc.LOGDEBUG)
                             continue
                             
                 except Exception as e:
-                    xbmc.log(f"plugin.video.rtve - Error with endpoint {login_url}: {str(e)}", xbmc.LOGDEBUG)
+                    xbmc.log(f"plugin.video.rtve - Error with fallback endpoint {login_url}: {str(e)}", xbmc.LOGDEBUG)
                     continue
             
-            # Step 3: Fallback - try to get session cookies by visiting the main site
-            xbmc.log("plugin.video.rtve - Trying fallback cookie approach", xbmc.LOGDEBUG)
-            try:
-                # Visit main RTVE Play page to establish session
-                main_page_url = "https://www.rtve.es/play/"
-                req = urllib.request.Request(
-                    main_page_url,
-                    headers={
-                        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
-                    }
-                )
-                opener.open(req, timeout=10)
-                
-                # Update session cookies from main page visit
-                for cookie in self.cookie_jar:
-                    self.session_cookies[cookie.name] = cookie.value
-                self._save_cookies()
-                
-                xbmc.log("plugin.video.rtve - Fallback approach completed - cookies saved", xbmc.LOGDEBUG)
-                # Return True to allow manual authentication via browser
-                return True
-                
-            except Exception as e:
-                xbmc.log(f"plugin.video.rtve - Fallback approach failed: {str(e)}", xbmc.LOGDEBUG)
-            
-            xbmc.log("plugin.video.rtve - All login attempts failed", xbmc.LOGERROR)
+            xbmc.log("plugin.video.rtve - All fallback login methods failed", xbmc.LOGWARNING)
             return False
-                    
+            
         except Exception as e:
-            xbmc.log(f"plugin.video.rtve - Error during login: {str(e)}", xbmc.LOGERROR)
+            xbmc.log(f"plugin.video.rtve - Fallback login error: {str(e)}", xbmc.LOGERROR)
             return False
     
     def get_auth_headers(self) -> Dict[str, str]:
