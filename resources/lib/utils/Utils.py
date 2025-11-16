@@ -6,6 +6,20 @@ from typing import Any, Optional, Dict
 
 import xbmc
 
+# Import auth module - use lazy import to avoid circular dependencies
+_auth_instance = None
+
+def _get_auth():
+    """Get auth instance (lazy initialization)"""
+    global _auth_instance
+    if _auth_instance is None:
+        try:
+            from resources.lib.utils.Auth import RTVEAuth
+            _auth_instance = RTVEAuth()
+        except Exception as e:
+            xbmc.log(f"plugin.video.rtve - Error initializing auth: {str(e)}", xbmc.LOGERROR)
+    return _auth_instance
+
 
 def buildUrl(query, base_url):
     return base_url + '?' + urllib.parse.urlencode(query)
@@ -16,7 +30,7 @@ class NetworkError(Exception):
     pass
 
 
-def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1) -> Dict[str, Any]:
+def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1, use_auth: bool = True) -> Dict[str, Any]:
     """
     Fetch JSON data from a URL with retry logic and proper error handling.
 
@@ -24,6 +38,7 @@ def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1) -> Dict
         apiUrl: The URL to fetch data from
         max_retries: Maximum number of retry attempts (default: 3)
         retry_delay: Delay between retries in seconds (default: 2)
+        use_auth: Whether to include authentication headers (default: True)
 
     Returns:
         Dict containing the parsed JSON data
@@ -31,9 +46,16 @@ def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1) -> Dict
     Raises:
         NetworkError: If all retry attempts fail or other network issues occur
     """
+    # Get authentication headers if available
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
+    
+    if use_auth:
+        auth = _get_auth()
+        if auth:
+            auth_headers = auth.get_auth_headers()
+            headers.update(auth_headers)
 
     for attempt in range(max_retries):
         try:
