@@ -27,17 +27,24 @@ def buildUrl(query, base_url):
 
 class NetworkError(Exception):
     """Custom exception for network-related errors"""
-    pass
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        super().__init__(message)
+        self.status_code = status_code
+    
+    def __str__(self):
+        if self.status_code:
+            return f"{super().__str__()} (Status: {self.status_code})"
+        return super().__str__()
 
 
-def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1, use_auth: bool = True) -> Dict[str, Any]:
+def getJsonData(apiUrl: str, max_retries: Optional[int] = None, retry_delay: Optional[int] = None, use_auth: bool = True) -> Dict[str, Any]:
     """
     Fetch JSON data from a URL with retry logic and proper error handling.
 
     Args:
         apiUrl: The URL to fetch data from
-        max_retries: Maximum number of retry attempts (default: 3)
-        retry_delay: Delay between retries in seconds (default: 2)
+        max_retries: Maximum number of retry attempts (uses config default if None)
+        retry_delay: Delay between retries in seconds (uses config default if None)
         use_auth: Whether to include authentication headers (default: True)
 
     Returns:
@@ -46,9 +53,29 @@ def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1, use_aut
     Raises:
         NetworkError: If all retry attempts fail or other network issues occur
     """
+    # Get network configuration
+    try:
+        from resources.lib.utils.NetworkConfig import network_config
+        timeout = network_config.get_timeout()
+        if max_retries is None:
+            max_retries = network_config.get_max_retries()
+        if retry_delay is None:
+            retry_delay = network_config.get_retry_delay()
+    except ImportError:
+        timeout = 30
+        if max_retries is None:
+            max_retries = 3
+        if retry_delay is None:
+            retry_delay = 2
+    
     # Get authentication headers if available
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache'
     }
     
     if use_auth:
@@ -57,24 +84,47 @@ def getJsonData(apiUrl: str, max_retries: int = 2, retry_delay: int = 1, use_aut
             auth_headers = auth.get_auth_headers()
             headers.update(auth_headers)
 
-    for attempt in range(max_retries):
+    for attempt in range(max_retries + 1):
         try:
+            xbmc.log(f"plugin.video.rtve - Fetching JSON from {apiUrl} (attempt {attempt + 1}/{max_retries + 1})", xbmc.LOGDEBUG)
+            
             req = urllib.request.Request(apiUrl, headers=headers)
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
                 if response.status == 200:
-                    return json.loads(response.read().decode('utf-8'))
+                    content = response.read()
+                    
+                    # Handle gzip encoding
+                    if response.info().get('Content-Encoding') == 'gzip':
+                        import gzip
+                        content = gzip.decompress(content)
+                    elif response.info().get('Content-Encoding') == 'deflate':
+                        import zlib
+                        content = zlib.decompress(content)
+                    
+                    result = json.loads(content.decode('utf-8'))
+                    xbmc.log(f"plugin.video.rtve - Successfully fetched JSON data", xbmc.LOGDEBUG)
+                    return result
                 else:
                     raise NetworkError(f"Server returned status code: {response.status}")
 
         except (urllib.error.URLError, socket.error) as e:
-            is_last_attempt = attempt == max_retries - 1
-            error_msg = f"Network error on attempt {attempt + 1}/{max_retries}: {str(e)}"
+            is_last_attempt = attempt == max_retries
+            
+            if "timed out" in str(e).lower():
+                error_msg = f"Request timed out on attempt {attempt + 1}/{max_retries + 1}: {str(e)}"
+            else:
+                error_msg = f"Network error on attempt {attempt + 1}/{max_retries + 1}: {str(e)}"
 
             if is_last_attempt:
-                raise NetworkError(f"Failed to fetch data after {max_retries} attempts: {str(e)}")
+                xbmc.log(f"plugin.video.rtve - Error with content type application/json: The read operation timed out", xbmc.LOGERROR)
+                raise NetworkError(f"Failed to fetch data after {max_retries + 1} attempts: {str(e)}")
             else:
-                xbmc.log(error_msg, xbmc.LOGERROR)  # Log the error
-                time.sleep(retry_delay)  # Wait before retrying
+                xbmc.log(error_msg, xbmc.LOGWARNING)
+                # Exponential backoff with jitter
+                import random
+                delay = retry_delay * (2 ** attempt) + random.uniform(0, 1)
+                xbmc.log(f"plugin.video.rtve - Waiting {delay:.1f}s before retry...", xbmc.LOGDEBUG)
+                time.sleep(delay)
 
         except json.JSONDecodeError as e:
             raise NetworkError(f"Failed to parse JSON response: {str(e)}")

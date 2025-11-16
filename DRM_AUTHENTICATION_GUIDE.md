@@ -64,8 +64,13 @@ Use the "Debug Authentication" option to see:
 **Issue**: "Content not found" error
 **Solution**: The video may not be available or may have been removed
 
-**Issue**: "Network error" 
-**Solution**: Check your internet connection and try again
+**Issue**: "Network error" or timeout errors
+**Solution**: 
+1. Check your internet connection
+2. Go to Plugin Settings → Network Settings
+3. Increase "Network Timeout" (try 60-120 seconds)
+4. Increase "Maximum Retries" (try 5-10)
+5. Increase "Retry Delay" (try 3-5 seconds)
 
 **Issue**: DRM decryption still fails after login
 **Solution**: 
@@ -74,7 +79,26 @@ Use the "Debug Authentication" option to see:
 3. Restart Kodi
 4. Use the debug feature to test specific video IDs
 
-### 5. Advanced Troubleshooting
+### 5. Network Configuration
+
+If you're experiencing frequent timeout errors, you can adjust network settings:
+
+1. Open Kodi Settings
+2. Go to Add-ons → My add-ons → Video add-ons → RTVE
+3. Click "Configure"
+4. Go to "Network Settings" tab
+5. Adjust the following settings:
+   - **Network Timeout**: Time to wait for server response (10-120 seconds)
+   - **Maximum Retries**: How many times to retry failed requests (1-10)
+   - **Retry Delay**: Wait time between retries (1-10 seconds)
+   - **Debug Logging**: Enable detailed logging for troubleshooting
+
+**Recommended settings for slow connections:**
+- Network Timeout: 60 seconds
+- Maximum Retries: 5
+- Retry Delay: 3 seconds
+
+### 6. Advanced Troubleshooting
 
 #### Enable Debug Logging
 1. Go to Kodi Settings > System > Logging

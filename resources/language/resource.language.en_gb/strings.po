@@ -1,0 +1,63 @@
+# RTVE Plugin Language File
+# English (UK)
+msgid ""
+msgstr ""
+"Language: en_GB\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+# Categories
+msgctxt "#30001"
+msgid "Authentication"
+msgstr ""
+
+msgctxt "#30002"
+msgid "Network Settings"
+msgstr ""
+
+msgctxt "#30003"
+msgid "Playback Settings"
+msgstr ""
+
+# Authentication Settings
+msgctxt "#30010"
+msgid "RTVE Username/Email"
+msgstr ""
+
+msgctxt "#30011"
+msgid "RTVE Password"
+msgstr ""
+
+msgctxt "#30012"
+msgid "Remember Login"
+msgstr ""
+
+# Network Settings
+msgctxt "#30020"
+msgid "Network Timeout (seconds)"
+msgstr ""
+
+msgctxt "#30021"
+msgid "Maximum Retries"
+msgstr ""
+
+msgctxt "#30022"
+msgid "Retry Delay (seconds)"
+msgstr ""
+
+msgctxt "#30023"
+msgid "Enable Debug Logging"
+msgstr ""
+
+# Playback Settings
+msgctxt "#30030"
+msgid "Video Quality"
+msgstr ""
+
+msgctxt "#30031"
+msgid "Enable Subtitles"
+msgstr ""
+
+msgctxt "#30032"
+msgid "Prefer Spanish Audio"
+msgstr ""
