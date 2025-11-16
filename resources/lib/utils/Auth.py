@@ -176,7 +176,7 @@ class RTVEAuth:
             xbmc.log("plugin.video.rtve - Attempting RTVE Play login via Gigya", xbmc.LOGDEBUG)
             
             # Step 1: Get Gigya API key from login page
-            login_page_url = "https://secure2.rtve.es/usuarios/acceso/login/"
+            login_page_url = "https://www.rtve.es/usuarios/acceso/login/"
             gigya_api_key = None
             
             try:
@@ -259,8 +259,8 @@ class RTVEAuth:
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
-                'Referer': 'https://secure2.rtve.es/usuarios/acceso/login/',
-                'Origin': 'https://secure2.rtve.es'
+                'Referer': 'https://www.rtve.es/usuarios/acceso/login/',
+                'Origin': 'https://www.rtve.es'
             }
             
             data = urllib.parse.urlencode(login_data).encode('utf-8')
@@ -325,8 +325,8 @@ class RTVEAuth:
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
-                'Referer': 'https://secure2.rtve.es/usuarios/acceso/login/',
-                'Origin': 'https://secure2.rtve.es'
+                'Referer': 'https://www.rtve.es/usuarios/acceso/login/',
+                'Origin': 'https://www.rtve.es'
             }
             
             data = urllib.parse.urlencode(login_data).encode('utf-8')
@@ -409,22 +409,22 @@ class RTVEAuth:
             # RTVE login endpoints to try in order of preference
             login_endpoints = [
                 {
+                    'url': 'https://www.rtve.es/usuarios/acceso/login/',
+                    'method': 'POST',
+                    'content_type': 'application/x-www-form-urlencoded'
+                },
+                {
                     'url': 'https://secure2.rtve.es/usuarios/acceso/login/',
                     'method': 'POST',
                     'content_type': 'application/x-www-form-urlencoded'
                 },
                 {
-                    'url': 'https://www.rtve.es/api/login',
+                    'url': 'https://www.rtve.es/api/usuarios/login',
                     'method': 'POST', 
                     'content_type': 'application/json'
                 },
                 {
                     'url': 'https://www.rtve.es/api/auth/login',
-                    'method': 'POST',
-                    'content_type': 'application/json'
-                },
-                {
-                    'url': 'https://secure2.rtve.es/api/login',
                     'method': 'POST',
                     'content_type': 'application/json'
                 }
@@ -469,8 +469,8 @@ class RTVEAuth:
                             headers = {
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
-                                'Referer': 'https://secure2.rtve.es/usuarios/acceso/login/',
-                                'Origin': 'https://secure2.rtve.es',
+                                'Referer': 'https://www.rtve.es/usuarios/acceso/login/',
+                                'Origin': 'https://www.rtve.es',
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
                         else:
@@ -478,8 +478,8 @@ class RTVEAuth:
                             headers = {
                                 'Content-Type': 'application/x-www-form-urlencoded',
                                 'Accept': 'application/json, text/html, */*',
-                                'Referer': 'https://secure2.rtve.es/usuarios/acceso/login/',
-                                'Origin': 'https://secure2.rtve.es'
+                                'Referer': 'https://www.rtve.es/usuarios/acceso/login/',
+                                'Origin': 'https://www.rtve.es'
                             }
                         
                         response_text = self._make_request(login_url, data=data, headers=headers, timeout=15, max_retries=2)

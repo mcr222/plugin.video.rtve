@@ -29,10 +29,10 @@ Completely bypass Gigya and authenticate directly with RTVE's own endpoints:
 
 ```python
 login_endpoints = [
-    'https://secure2.rtve.es/usuarios/acceso/login/',  # Form-based login
-    'https://www.rtve.es/api/login',                   # JSON API
-    'https://www.rtve.es/api/auth/login',             # Alternative API
-    'https://secure2.rtve.es/api/login'               # Secure API
+    'https://www.rtve.es/usuarios/acceso/login/',      # Primary RTVE login page
+    'https://secure2.rtve.es/usuarios/acceso/login/',  # Secure fallback
+    'https://www.rtve.es/api/usuarios/login',          # Users API endpoint
+    'https://www.rtve.es/api/auth/login'               # Auth API endpoint
 ]
 ```
 
@@ -120,8 +120,8 @@ No configuration changes are required. The plugin will automatically:
 1. **Try Direct RTVE Login First**:
    ```
    plugin.video.rtve - Attempting direct RTVE authentication
-   plugin.video.rtve - Trying direct login endpoint: https://secure2.rtve.es/usuarios/acceso/login/
-   plugin.video.rtve - Direct RTVE login successful via https://secure2.rtve.es/usuarios/acceso/login/!
+   plugin.video.rtve - Trying direct login endpoint: https://www.rtve.es/usuarios/acceso/login/
+   plugin.video.rtve - Direct RTVE login successful via https://www.rtve.es/usuarios/acceso/login/!
    ```
 
 2. **Fallback to Gigya if Needed**:
