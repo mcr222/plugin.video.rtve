@@ -181,6 +181,10 @@ class RTVEAuth:
             # Step 1: Visit the main login page to get initial cookies and CSRF tokens
             login_page_url = "https://secure2.rtve.es/usuarios/acceso/login/"
             
+            # Initialize variables outside try block to ensure they're always available
+            csrf_token = None
+            form_action = None
+            
             try:
                 login_page_content = self._make_request(login_page_url)
                 if not login_page_content:
@@ -190,8 +194,6 @@ class RTVEAuth:
                 xbmc.log("plugin.video.rtve - Retrieved login page", xbmc.LOGDEBUG)
                 
                 # Extract CSRF token or other required fields from the login page
-                csrf_token = None
-                form_action = None
                 csrf_match = re.search(r'name=["\']_token["\'] value=["\']([^"\']+)["\']', login_page_content)
                 if csrf_match:
                     csrf_token = csrf_match.group(1)
